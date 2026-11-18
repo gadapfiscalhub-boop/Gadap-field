@@ -1,0 +1,18 @@
+{
+  "name": "GADAP Field - Canteiro de Obras",
+  "short_name": "GADAP Field",
+  "description": "PWA Blindado de Campo para Mestres de Obras, Engenheiros e Apontadores.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
