@@ -28,3 +28,4 @@
 - Support both dark mode and Sun Mode (`sunMode` prop).
 - Preserve offline-first behavior when adding new field actions.
 - Always commit completed changes with a clear conventional commit message.
+- Always update `components/HelpPanel.tsx` whenever features or UI flows are added or changed.
