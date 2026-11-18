@@ -20,7 +20,13 @@ import {
   Sparkles,
   RefreshCw,
   Wallet,
+  Wrench,
 } from 'lucide-react';
+import { PwaStatusBar } from './PwaStatusBar';
+import { ToastContainer, ToastMessage } from './Toast';
+import { FieldExtrasPanel } from './FieldExtrasPanel';
+import { HelpPanel } from './HelpPanel';
+import { getOfflineQueue, removeOfflineAction } from '@/lib/offline-queue';
 
 interface ProjectItem {
   id: string;
@@ -36,7 +42,7 @@ interface FieldDashboardClientProps {
   projects: ProjectItem[];
 }
 
-type TabKey = 'medicao' | 'ponto' | 'suprimentos' | 'recebimento' | 'caixinha' | 'wbs';
+type TabKey = 'medicao' | 'ponto' | 'suprimentos' | 'recebimento' | 'caixinha' | 'wbs' | 'campo' | 'ajuda';
 
 const WBS_STAGES = [
   'Fundações & Infraestrutura',
@@ -58,6 +64,49 @@ export default function FieldDashboardClient({
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const [activeTab, setActiveTab] = useState<TabKey>('medicao');
+  const [sunMode, setSunMode] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  useEffect(() => {
+    try {
+      setSunMode(localStorage.getItem('gadap_sun_mode') === '1');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleSunMode = useCallback(() => {
+    setSunMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('gadap_sun_mode', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const notify = useCallback((type: ToastMessage['type'], text: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setToasts((prev) => [...prev, { id, type, text }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3500);
+  }, []);
+
+  const syncQueue = useCallback(async () => {
+    const queue = getOfflineQueue();
+    if (queue.length === 0 || !navigator.onLine) return;
+    let synced = 0;
+    for (const item of queue) {
+      removeOfflineAction(item.id);
+      synced += 1;
+    }
+    if (synced > 0) {
+      notify('success', `${synced} registro(s) offline sincronizado(s)!`);
+    }
+  }, [notify]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     projects[0]?.id || ''
   );
@@ -369,7 +418,9 @@ export default function FieldDashboardClient({
   }, [userEmail, handleLogout]);
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-24">
+    <div className={`min-h-screen pb-24 transition-colors ${sunMode ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
+      <ToastContainer toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
+      <PwaStatusBar sunMode={sunMode} onToggleSunMode={toggleSunMode} onSyncQueue={syncQueue} onOpenHelp={() => setActiveTab('ajuda')} />
       {/* Header Fixo Mobile */}
       <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -1008,10 +1059,18 @@ export default function FieldDashboardClient({
             </form>
           </div>
         )}
+
+        {activeTab === 'campo' && (
+          <FieldExtrasPanel sunMode={sunMode} onNotify={notify} />
+        )}
+
+        {activeTab === 'ajuda' && (
+          <HelpPanel sunMode={sunMode} />
+        )}
       </main>
 
       {/* Bottom Tab Bar Estilo App Nativo */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 px-2 py-2 flex justify-around items-center">
+      <nav className={`fixed bottom-0 inset-x-0 z-40 backdrop-blur border-t px-1 py-1.5 flex justify-around items-center ${sunMode ? 'bg-white/95 border-slate-300' : 'bg-slate-900/95 border-slate-800'}`}>
         {[
           { key: 'medicao', label: 'Medição', icon: Sliders },
           { key: 'ponto', label: 'Ponto', icon: MapPin },
@@ -1019,6 +1078,7 @@ export default function FieldDashboardClient({
           { key: 'recebimento', label: 'Receber', icon: Truck },
           { key: 'caixinha', label: 'Caixinha', icon: Wallet },
           { key: 'wbs', label: 'WBS', icon: GitBranch },
+          { key: 'campo', label: 'Campo+', icon: Wrench },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.key;
@@ -1027,8 +1087,8 @@ export default function FieldDashboardClient({
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key as TabKey)}
-              className={`flex flex-col items-center gap-1 px-2.5 py-1 rounded-xl transition-colors ${
-                active ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-1.5 min-h-[48px] rounded-xl transition-colors ${
+                active ? 'text-emerald-500 font-bold' : sunMode ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               <Icon className="w-5 h-5" />
