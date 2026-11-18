@@ -107,6 +107,47 @@ export default function FieldDashboardClient({
       notify('success', `${synced} registro(s) offline sincronizado(s)!`);
     }
   }, [notify]);
+
+  const detectWeather = useCallback(async () => {
+    setWeatherLoading(true);
+    const gps = (await fetchGps()) || { lat: -23.5505, lng: -46.6333 };
+    try {
+      const key = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY || '';
+      if (!key) return;
+      const r = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${gps.lat}&lon=${gps.lng}&appid=${key}&units=metric&lang=pt_br`
+      );
+      if (r.ok) {
+        const d = await r.json();
+        const main = (d.weather?.[0]?.main || '').toLowerCase();
+        const desc = d.weather?.[0]?.description || '';
+        const temp = Math.round(d.main?.temp ?? 0);
+        const rain = d.rain?.['1h'] ?? 0;
+        if (main.includes('thunderstorm') || rain >= 5) {
+          setWeatherCondition('chuva_forte');
+          setWeatherImpactDays(1);
+        } else if (main.includes('rain') || main.includes('drizzle') || rain > 0) {
+          setWeatherCondition('chuva_leve');
+          setWeatherImpactDays(0.5);
+        } else if (main.includes('cloud')) {
+          setWeatherCondition('nublado');
+          setWeatherImpactDays(0);
+        } else {
+          setWeatherCondition('sol');
+          setWeatherImpactDays(0);
+        }
+        setWeatherInfo(`${d.name || 'Canteiro'}: ${temp}°C, ${desc}`);
+      }
+    } catch {
+      // ignore offline/network errors
+    } finally {
+      setWeatherLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    detectWeather();
+  }, [detectWeather]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     projects[0]?.id || ''
   );
@@ -582,43 +623,10 @@ export default function FieldDashboardClient({
                     <button
                       type="button"
                       disabled={weatherLoading}
-                      onClick={async () => {
-                        setWeatherLoading(true);
-                        const gps = (await fetchGps()) || { lat: -23.5505, lng: -46.6333 };
-                        try {
-                          const key = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY || '';
-                          if (!key) return;
-                          const r = await fetch(
-                            `https://api.openweathermap.org/data/2.5/weather?lat=${gps.lat}&lon=${gps.lng}&appid=${key}&units=metric&lang=pt_br`
-                          );
-                          if (r.ok) {
-                            const d = await r.json();
-                            const main = (d.weather?.[0]?.main || '').toLowerCase();
-                            const desc = d.weather?.[0]?.description || '';
-                            const temp = Math.round(d.main?.temp ?? 0);
-                            const rain = d.rain?.['1h'] ?? 0;
-                            if (main.includes('thunderstorm') || rain >= 5) {
-                              setWeatherCondition('chuva_forte');
-                              setWeatherImpactDays(1);
-                            } else if (main.includes('rain') || main.includes('drizzle') || rain > 0) {
-                              setWeatherCondition('chuva_leve');
-                              setWeatherImpactDays(0.5);
-                            } else if (main.includes('cloud')) {
-                              setWeatherCondition('nublado');
-                              setWeatherImpactDays(0);
-                            } else {
-                              setWeatherCondition('sol');
-                              setWeatherImpactDays(0);
-                            }
-                            setWeatherInfo(`${d.name || 'Canteiro'}: ${temp}°C, ${desc}`);
-                          }
-                        } finally {
-                          setWeatherLoading(false);
-                        }
-                      }}
+                      onClick={detectWeather}
                       className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300"
                     >
-                      {weatherLoading ? 'Consultando...' : '📍 Detectar via GPS'}
+                      {weatherLoading ? 'Consultando...' : '📍 Atualizar via GPS'}
                     </button>
                   </div>
                   {weatherInfo && (
